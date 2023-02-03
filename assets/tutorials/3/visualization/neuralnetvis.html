@@ -1,0 +1,1015 @@
+<!-- 
+Author: Shannon Shih 
+Created: 1/2017
+Organization: Machine Learning at Berkeley
+-->
+<!DOCTYPE html>
+<html>
+<head xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  
+  
+
+    <style>
+      /* explanation for @namespace here: http://stackoverflow.com/questions/23034283/is-it-possible-to-use-htmls-queryselector-to-select-by-xlink-attribute-in-an */
+      @namespace xlink "http://www.w3.org/1999/xlink";
+      circle.node:hover {
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+        transition: all 200ms ease-out;
+      }
+    </style>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<!--    <script type="text/javascript" src="http://code.interactjs.io/v1.2.6/interact.min.js"></script>-->
+  
+  
+  
+  <script type="text/javascript" async>
+    if (!document.registerElement) {
+        document.writeln(decodeURI('%3Cscript%20src=%22https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.12/webcomponents.min.js%22%20type=%22text/javascript%22%3E%3C/script%3E'));
+    }
+  </script>
+
+<script src="knob/index.js" type="text/javascript" async></script>
+<link id="knobstyle" href="knob/style.css" type="text/css" rel="stylesheet">
+
+
+
+<style type="text/css" shim-shadowdom>
+/* Requires shim-shadowdom and webcomponentsjs in Firefox (due to lack of ::shadow support). https://github.com/Polymer/docs/issues/269 */
+#transition x-knob::shadow .knob_gfx { transition: 125ms transform; }
+</style>
+  
+</head>
+
+<body>
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+  
+  
+
+    <script> // sizing variables
+      
+      var ratio = window.devicePixelRatio || 1;
+//      var width = screen.width * ratio;
+      var width = (parent.interactivewidth-100) || 600;
+      var height = parent.interactiveheight+200 || 600;
+      
+      if(screen.width/ratio < width) {
+        width = 360;
+      }
+      var nodeSize = width*0.0208+12.5; // set to 25 on 600px+ screens, set to 20 on 360px screens
+      
+      var inputrange = 1; // goes from -inputrange to inputrange
+      var inputprecision = 0.01; // step size
+      var outputprecision = 100; // 1 decimal = 10, 2 decimals = 100, etc.
+      
+      var weightrange = 2;
+      var weightprecision = 0.1;
+      
+      var labeloffset = "13%"; // controls how far from the nodes the weights are displayed 
+
+      var inputcolor = "#60ba46";
+      var outputcolor = "#006fff";
+      
+      var weightcolor = "#60ba46"; // green
+      var outputcolor = "#006fff"; // blue
+      var biascolor = "#ed3624"; // red
+      var sumcolor = "#a21cc4"; // purple
+      var operationcolor = "black";
+      var activationcolor = "#a21cc4"; // purple
+      var resultcolor = "#006fff"; // blue
+      
+      var outputArrowLength = nodeSize*9;
+      
+      activation_fn = sigmoid;
+      function sigmoid(t) {
+        return 1/(1+Math.pow(Math.E, -t));
+      }
+      
+      /* functionality settings */
+      var transitionDuration = 300;
+      var transitionDelay = 10;
+      
+      // commentary
+      var directions = "Drag the slider on the left to change the input <br>" + 
+                       "Drag the horizontal sliders to change the weights <br>" + 
+                       "Turn the gray knobs to change the bias.";
+      var inputlayer_outputphase = "The input node only outputs its given value. The receiving neurons multiply their inputs by their respective weights";
+      var inputlayer_biasphase = "The receiving neurons add their bias to their inputs";
+      var inputlayer_resultphase = "";
+      var inputlayer_activationphase = "The hidden neuron applies its activation function to the result.";
+      
+      var hiddenlayer_outputphase = "The output neuron receives the results of the previous layers' calculations";
+      var hiddenlayer_biasphase = "The receiving neurons add their bias to their inputs";
+      var hiddenlayer_resultphase = "";
+      var hiddenlayer_activationphase = "The receiving neuron multiplies its inputs by their corresponding weights";
+      
+      var outputlayer_outputphase = "The output neuron sums up the results...";
+      var outputlayer_biasphase = "...and adds its own bias to it";
+      var outputlayer_resultphase = "";
+      var outputlayer_activationphase = "Finally, the output neuron applies its activation to the result, which becomes the output of the whole neural network.";
+      
+    </script>
+    <script> // process nodes
+      
+      // works best if the layer indices start at 1
+      data = [
+        {"label": "input 1", "layer": 1, bias: 0},
+        {"label": "hidden 1", "layer": 2, bias: 0},
+        {"label": "hidden 2", "layer": 2, bias: 0},
+        {"label": "output 1", "layer": 3, bias: 0}
+      ];
+      
+      // refer to nodes by their labels. 
+      // if a weight isn't specified for a connection, default will be 1
+      weights = [
+        {"startLabel": "input 1", "endLabel": "hidden 1", "weight": 1},
+        {"startLabel": "hidden 1", "endLabel": "output 1", "weight": -0.5},
+        {"startLabel": "input 1", "endLabel": "hidden 2", "weight": 2}
+      ]
+      
+      // creates a dict containing the number of nodes in each layer
+      // structure[layer] = # of nodes
+      function getStructure(data) {
+        var structure = {};
+        for(var i = 0; i < data.length; i++) {
+          var node = data[i];
+          if(node.layer in structure) {
+            structure[node.layer] += 1;
+          }
+          else {
+            structure[node.layer] = 1;
+          }
+        }
+        return structure;
+      }
+      
+      // dict containing how many nodes in each layer
+      // networkStructure[layer] = # of nodes
+      var networkStructure = getStructure(data); 
+      
+      var inputlayer = Math.min.apply(null, Object.keys(networkStructure));
+      var outputlayer = Math.max.apply(null, Object.keys(networkStructure));
+      
+      // creates nodes with labels, layers, and position
+      function positionNodes(data, structure) {
+        var nodes = []; // contains newly created nodes
+        // sets width between layers. Subtracting nodeSize to make space for output display
+        var layerwidth = (width-2*nodeSize) / (Object.keys(structure).length);
+        // counts number of nodes drawn so far in each layer (inverse of structure)
+        var nodeCount = {};
+        for(var i = 0; i < data.length; i++) {
+          if(data[i].layer in nodeCount) {
+            nodeCount[data[i].layer] += 1;
+          }
+          else {
+            nodeCount[data[i].layer] = 1;
+          }
+          var node = {"id": i,
+                      "label": data[i].label,
+                      "layer": data[i].layer,
+                      "bias": data[i].bias};
+          var x = (layerwidth) * (node.layer - 1) + nodeSize*2;
+          var y = nodeCount[node.layer] * (height - 2*nodeSize) / (structure[node.layer] + 1);
+          node["x"] = x;
+          node["y"] = y;
+          nodes.push(node);
+        }
+        return nodes;
+      }
+      
+      var nodes = positionNodes(data, networkStructure);
+    </script>
+  
+    <script> // draw lines between nodes
+      var lines = [];
+      for(var start = 0; start < nodes.length; start++) {
+        var startNode = nodes[start];
+        for(var end = 0; end < nodes.length; end++) {
+          var endNode = nodes[end];
+          if(endNode.layer === startNode.layer + 1) {
+            // find weight for connection from weights array, if any
+            
+            lineweight = weights.find(function(x) {return x.startLabel === startNode.label
+                                                       && x.endLabel === endNode.label;});
+            if(lineweight) {
+              lineweight = lineweight.weight;
+            }
+            else {
+              lineweight = 1;
+            }
+              
+            lines.push({"x1": startNode.x, 
+                        "y1": startNode.y,
+                        "x2": endNode.x, 
+                        "y2": endNode.y, 
+                        "weight": lineweight,
+                        "connection": startNode.layer.toString() + "-" + endNode.layer.toString(),
+                        // id format: index_of_startNode_in_nodes-index_of_endNode_in_nodes
+                        "id": start.toString() + "-" + end.toString()}); 
+          }
+          
+          
+        }
+        // also include output arrows
+          if(startNode.layer == outputlayer) {
+            lines.push({"x1": endNode.x,
+                        "y1": endNode.y,
+                        "x2": endNode.x + outputArrowLength, 
+                        "y2": endNode.y, 
+                        "weight": 5,
+                        "connection": endNode.layer.toString() + "-" + (endNode.layer+1).toString(),
+                        // id format: index_of_startNode_in_nodes-index_of_endNode_in_nodes
+                        "id": start.toString() + "-" + (start+1).toString()});
+          }
+      }
+
+    </script>
+    <script type='text/template' id='knobgradient'>
+
+          <radialGradient id="knobgradient"> <!-- referenced in CSS -->
+            <stop offset="0" stop-color="gray"/>
+            <stop offset="1" stop-color="silver"/>
+          </radialGradient>
+
+      </script>
+  
+  
+      <script type='text/template' id='knob'>
+        <g class="knob" data-speed="null" data-rotations="null">
+          <circle class="knob_center" cx="0" cy="0" r="0.015625"/>
+          <g class="knob_gfx">
+            <circle cx="0" cy="0" r="5"/>
+            <line x1="0" y1="-2.5" x2="0" y2="-4.5"/>
+          </g>
+          <text class="knob_number"/>
+        </g>
+      </script>
+  
+    <script async>
+
+      var svg = d3.select("body").append("svg")
+        .attr("xmlns", "http://www.w3.org/2000/svg")
+//        .attr("viewBox", "0 50 800 800") // I would scale, but foreignObject bug doesn't let me
+        .attr("width", width+2*nodeSize)
+        .attr("height", height*2/3);
+      
+      var knobgradient = d3.select('#knobgradient').html();
+      var gradient = svg.append(function() {
+        var g = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        g.innerHTML = knobgradient;
+        return g;
+      });
+      
+      var style = svg.append(function() {
+        return document.getElementById('knobstyle');
+      });
+      
+      //      svg.append("foreignObject")
+//              .attr("width", nodeSize)
+//              .attr("height", nodeSize*4)
+//              .attr("x", d.x - 2*nodeSize)
+//              .attr("y", d.y - 2*nodeSize)
+//              .append("xhtml:form").append("xhtml:input") // xhtml tells d3.js it's HTML, not SVG
+//                  .attr("class", "input_slider")
+//                  .attr("value", 0)
+//                  .attr("min", -inputrange)
+//                  .attr("max", inputrange)
+//                  .attr("step", inputprecision)
+//                  .attr("type", "range")
+//                  .attr("style", "height: " + (nodeSize*4-10).toString())
+//                  .attr("orient", "vertical")
+//                  .attr("data-node", i)
+//                  .attr("oninput", "changeInput.apply(this)");
+
+      
+      function changeInput() {
+        var i = this.getAttribute('data-node');
+        d3.selectAll('.nodetext')[0][i].innerHTML = d3.selectAll('.input_slider')[0][i].value;
+      }
+      
+      //              var weight = document.getElementById(this.getAttribute('data-line'));
+//              var weightlabel = document.querySelectorAll('[*|href="#' + this.getAttribute('data-line') + '"]')[0];
+//              strokewidth = parseFloat(document.querySelectorAll('[*|href="#' + this.getAttribute('data-line') + '"]')[0].innerHTML);
+//
+//              if(d3.event.dy > 2 && strokewidth < weightSize) {
+//                strokewidth = strokewidth+1;
+//                weight.setAttribute('stroke-width', Math.abs(strokewidth));
+//              }
+//              else if(d3.event.dy < -2 && strokewidth > -weightSize) {
+//                strokewidth = strokewidth-1;
+//                weight.setAttribute('stroke-width', Math.abs(strokewidth));
+//              }
+//              weightlabel.innerHTML = strokewidth;
+//            
+//              // adjust weight text as line thickens
+//              weightlabel.parentElement.setAttribute("dy", (-Math.abs(strokewidth)/2-12).toString());
+      
+      // changes the weight according to the weight's corresponding slider position
+      // id is the nodeIndex-to-nodeIndex that the weight is connecting
+      function changeWeight(id) {
+        var weight = d3.selectAll("[id='" + id + "']")[0][0];
+        var weightlabel = d3.selectAll('[*|href="#' + id + '"][class="weight"]')[0][0];
+        var sliderValue = d3.selectAll("[slider-node-to-node-index='" + id + "']")[0][0].value;
+        
+        weight.setAttribute("stroke-width", Math.abs(sliderValue));
+        weightlabel.innerHTML = sliderValue;
+//        weight.setAttribute("")
+      }
+
+      var line = svg.selectAll("lines")
+                    .data(lines).enter()
+                    .append(function(d, i) {
+                      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                      path.setAttribute("d", "M " + d.x1 + " " + d.y1 + " L " + d.x2 + " " + d.y2);
+                      function getStroke() {
+                        if(d.connection == outputlayer.toString() + "-" + (outputlayer+1).toString()){ // make output arrows a different color
+                          return outputcolor;
+                        }
+                        else{
+                          return "black";
+                        }
+                      }
+                      path.setAttribute("stroke", getStroke());
+                      path.setAttribute("stroke-width", Math.abs(d.weight));
+                      path.setAttribute("id", d.id);
+                      
+                      function getMarker(){ // draw pointer at end of output arrow
+                        if(d.connection == outputlayer.toString() + "-" + (outputlayer+1).toString()) {
+                          return "url(#arrow)";
+                        }
+                      }
+                      path.setAttribute("marker-end", getMarker());
+      
+            
+                      if(!d.connection.includes(outputlayer + "-")) {
+                        var weightslider = svg.append("foreignObject")
+                            .attr("width", nodeSize*3+4)
+                            .attr("height", nodeSize*2)
+                            .attr("x", function() { // draw sliders above or below line
+                                          if(d.connection.includes(outputlayer)) { // this is hardcoding to ensure that sliders are on outside of neural net
+                                            var offset = 0;
+                                            if((d.y1-d.y2)/(d.x1-d.x2) > 0) { // sloping up
+                                              offset = (d.x1+d.x2)/2; 
+                                            }
+                                            else {
+                                              offset = (d.x1+d.x2)/2;
+                                            }
+                                          }
+                                          else if((d.y1-d.y2)/(d.x1-d.x2) <= 0) {
+                                            offset = (d.x1+d.x2)/2-2.5*nodeSize;
+                                          }
+                                          else {
+                                            offset = (d.x1+d.x2)/2-2.5*nodeSize;
+                                          }
+                                          return offset;
+                                        })
+                            .attr("y", function() { // draw sliders above or below line
+                                          if(d.connection.includes(outputlayer)) { // this is hardcoding to ensure that sliders are on outside of neural net
+                                            var offset = 0;
+                                            if((d.y1-d.y2)/(d.x1-d.x2) > 0) { // sloping up
+                                              offset = (d.y1+d.y2)/2-3.5*nodeSize; 
+                                            }
+                                            else {
+                                              offset = (d.y1+d.y2)/2+2*nodeSize;
+                                            }
+                                          }
+                                          else if((d.y1-d.y2)/(d.x1-d.x2) <= 0) {
+                                            offset = (d.y1+d.y2)/2-3.5*nodeSize;
+                                          }
+                                          else {
+                                            offset = (d.y1+d.y2)/2+2*nodeSize;
+                                          }
+                                          return offset;
+                                        });
+                            weightslider.append("xhtml:form").append("xhtml:input") // xhtml tells d3.js it's HTML, not SVG
+                                .attr("class", "weight_slider")
+                                .attr("value", d.weight)
+                                .attr("min", -weightrange)
+                                .attr("max", weightrange)
+                                .attr("step", weightprecision)
+                                .attr("type", "range")
+                                .style("width", nodeSize*3 + "px")
+                                .attr("orient", "")
+                                .attr("slider-node-to-node-index", d.id)
+                                .attr("oninput", "changeWeight.apply(this,['" + d.id + "'])");
+                            weightslider.append("xhtml:center").append("xhtml:div")
+                                .attr("style", "font-family: 'PT Sans', Helvetica, Arial, sans-serif;")
+                                .text("weight");
+                      }
+              
+                      return path;
+                    });
+      
+      // an invisible line that is thicker than the actual line for ease of interaction
+      // used for changing weights by dragging
+//      var selectable = svg.selectAll("selectable")
+//                    .data(lines).enter()
+//                    .append("path")
+//                      .attr("d", function(d) { return "M " + d.x1 + " " + d.y1 + " L " + d.x2 + " " + d.y2;})
+////                      .attr("stroke", "red")
+//                      .attr("stroke-width", nodeSize)
+//                      .attr("data-line", function(d) {return d.id;})
+//                      .attr("pointer-events", "visible");
+      
+      // enables changing weight by dragging
+      // known bug: horizontal lines don't thicken when dragged (drag event isn't even triggered)
+//      var drag = d3.behavior.drag()
+//          .on("drag", function(d, i) {
+//            
+//              var weight = document.getElementById(this.getAttribute('data-line'));
+//              var weightlabel = document.querySelectorAll('[*|href="#' + this.getAttribute('data-line') + '"]')[0];
+//              strokewidth = parseFloat(document.querySelectorAll('[*|href="#' + this.getAttribute('data-line') + '"]')[0].innerHTML);
+//
+//              if(d3.event.dy > 2 && strokewidth < weightSize) {
+//                strokewidth = strokewidth+1;
+//                weight.setAttribute('stroke-width', Math.abs(strokewidth));
+//              }
+//              else if(d3.event.dy < -2 && strokewidth > -weightSize) {
+//                strokewidth = strokewidth-1;
+//                weight.setAttribute('stroke-width', Math.abs(strokewidth));
+//              }
+//              weightlabel.innerHTML = strokewidth;
+//            
+//              // adjust weight text as line thickens
+//              weightlabel.parentElement.setAttribute("dy", (-Math.abs(strokewidth)/2-12).toString());
+//          
+//          }
+//      );
+//      selectable.call(drag);
+      
+      var weightlabels = svg.selectAll("weights")
+                    .data(lines).enter()
+                    .append("text")
+                      .attr("style", "text-anchor: left;")
+                      .attr("dy", function(d) { // draw text above or below line
+                        if(d.connection.includes("-" + outputlayer)) { // this is hardcoding to ensure that the text is printed on outside of neural net
+                          if((d.y1-d.y2)/(d.x1-d.x2) > 0) {
+                            return "-12";
+                          }
+                          else {
+                            return "15";
+                          }
+                        }
+                        if((d.y1-d.y2)/(d.x1-d.x2) <= 0) {
+                          return "-12";
+                        }
+                        else {
+                          return "15";
+                        }
+                      })
+      weightlabels.append("textPath")
+                      .attr("class", "weight")
+                      .attr("xlink:href", function(d) {return "#" + d.id})
+                      .attr("data-layer-to-layer", function(d) {return d.connection;})
+                      .attr("data-node-to-node-index", function(d) {return d.id})
+                      .attr("fill", weightcolor)
+                      .attr("lengthAdjust", "spacingAndGlyphs")
+                      .attr("startOffset", labeloffset)
+
+//                      .attr("textLength", function() {
+//                        return document.getElementById(this.getAttribute('href').slice(1)).getBoundingClientRect().width - nodeSize;
+//                      })
+                      .text(function(d) {
+                            if(d.connection == outputlayer.toString() + "-" + (outputlayer+1).toString()) {return "";}
+                            else {return d.weight;}});
+      
+      /* animated text */
+      // bias 
+      weightlabels.append("textPath")
+                      .attr("class", "animatedtext")
+                      .attr("xlink:href", function(d) {return "#" + d.id})
+                      .attr("data-layer-to-layer", function(d) {return d.connection;})
+                      .attr("data-node-to-node-index", function(d) {return d.id})
+                      .attr("data-phase", "bias")
+                      .attr("startOffset", "100%")
+                      .attr("fill", biascolor)
+                      .text();
+      // output
+      weightlabels.append("textPath")
+                      .attr("class", "animatedtext")
+                      .attr("xlink:href", function(d) {return "#" + d.id})
+                      .attr("data-layer-to-layer", function(d) {return d.connection;})
+                      .attr("data-node-to-node-index", function(d) {return d.id})
+                      .attr("data-phase", "output")
+                      .attr("fill", outputcolor)
+                      .attr("startOffset", "0%")
+                      .text();
+      // result
+      weightlabels.append("textPath")
+                      .attr("class", "animatedtext")
+                      .attr("xlink:href", function(d) {return "#" + d.id})
+                      .attr("data-layer-to-layer", function(d) {return d.connection;})
+                      .attr("data-node-to-node-index", function(d) {return d.id})
+                      .attr("data-phase", "result")
+                      .attr("fill", resultcolor)
+                      .attr("startOffset", "0%")
+                      .text();
+      // activation
+      weightlabels.append("textPath")
+                      .attr("class", "animatedtext")
+                      .attr("xlink:href", function(d) {return "#" + d.id})
+                      .attr("data-layer-to-layer", function(d) {return d.connection;})
+                      .attr("data-node-to-node-index", function(d) {return d.id})
+                      .attr("data-phase", "activation")
+                      .attr("startOffset", "0%")
+                      .style("opacity", 0)
+                      .text();
+
+      var node = svg.selectAll("node")
+        .data(nodes)
+        .enter()
+        .append("g")
+//          .attr("class", "dial")
+          .attr("transform", function(d) {
+            return "translate(" + d.x + ", " + d.y + ")";});
+      
+      var outputnodes = node.filter(function(d) {return d.layer == outputlayer;});
+      
+      outputnodes.append("svg:defs").append("svg:marker")
+        .attr("id", "arrow")
+        .attr("refX", 2)
+        .attr("refY", 2)
+        .attr("markerWidth", 60)
+        .attr("markerHeight", 60)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M 0 0 4 2 0 4 1 2")
+        .style("fill", outputcolor);
+
+      
+
+        var animatedoutput = svg.selectAll("animatedoutputs").data(nodes).enter().append("text")
+        .filter(function(d) {return d.layer == outputlayer;})
+          .attr("class", "test")
+          .attr("style", "text-anchor: left")
+          .attr("dy", "-12")
+          .append("textpath")
+            .attr("xlink:href", "#3")
+            .text("hi");
+
+      
+        outputnodes.append("text")
+          .attr("dx", outputArrowLength + 10)
+          .attr("style", "text-anchor: left; alignment-baseline: middle;")
+          .attr("data-output-index", function(d){return d.id;})
+          .text("");
+      
+
+        var knobcode = d3.select('#knob').html();
+        var knobs = node.append(function(d, i) {
+        // make this if statement, check data if 1 < layer < max and draw sliders for input output layers
+        if(d.layer === inputlayer) {
+          var g = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          g.setAttribute("r", nodeSize);
+          g.setAttribute("class", "node");
+          g.setAttribute("fill", inputcolor);
+          
+          
+          // add slider
+          svg.append("foreignObject")
+              .attr("width", nodeSize)
+              .attr("height", nodeSize*4)
+              .attr("x", d.x - 2*nodeSize)
+              .attr("y", d.y - 2*nodeSize)
+              .append("xhtml:form").append("xhtml:input") // xhtml tells d3.js it's HTML, not SVG
+                  .attr("class", "input_slider")
+                  .attr("value", 0)
+                  .attr("min", -inputrange)
+                  .attr("max", inputrange)
+                  .attr("step", inputprecision)
+                  .attr("type", "range")
+                  .attr("style", "height: " + (nodeSize*4-10).toString())
+                  .attr("orient", "vertical")
+                  .attr("data-node", i)
+                  .attr("oninput", "changeInput.apply(this)");
+
+        }
+        else {
+          // create knobs that allow users to adjust bias
+          var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          g.innerHTML = knobcode;
+          g.setAttribute("viewBox", "-6 -6 24 24");
+          g.setAttribute("style", "transform: scale(" + nodeSize/5 + ")");
+
+          if(d.layer === outputlayer) {g.setAttribute("class", "dial node outputnode");}
+          else {g.setAttribute("class", "dial node");}
+
+          g.getElementsByClassName('knob_number')[0].setAttribute('data-index', i);
+        }
+        return g;
+      });
+      
+      var text = node.append("text")
+          .attr("class", "nodetext")
+          .attr("style", "text-anchor: middle; alignment-baseline: middle;")
+          .attr("dx", 0)
+          .attr("dy", function(d) {
+            if(d.layer === inputlayer) {
+              return 0;
+            }
+            else {
+              return -nodeSize*1.5;
+            }
+          })
+          .attr("fill", function(d) {
+            if(d.layer === inputlayer) {
+              return "white";
+            }
+            else {return "black";}
+          })
+          .attr("data-index", function(d, i) {return i;})
+          .attr("data-layer", function(d, i) {return d.layer;})
+          .text(function addSlider(d, i) {
+            if(d.layer === inputlayer) {
+              return d3.selectAll(".input_slider")[0][i].value;
+            }
+            else {
+              return "bias";
+            }
+          });
+    </script>
+  
+<!--  the actual simulation -->
+  <script>
+    
+    function insertDirections() {  
+      var commentary = document.getElementById("commentary");
+      // put directions in commentary
+      commentary.innerHTML = directions;
+    }
+    
+    var layercount = inputlayer;
+    var phases = ["output", "bias", "result", "activation"];
+    var phaseindex = 0;
+    var currentphase = phases[phaseindex];
+    
+
+    /* all operations are output * weight (already displayed) + bias = result */
+    function moveText() {
+      d3.selectAll(".weight_slider").attr("disabled", "true"); // disable slider changing during animation
+      var final_result;
+      // select all weights between layercount and layercount + 1
+      var label = d3.selectAll("[data-layer-to-layer='" + layercount.toString() + "-" + (layercount+1).toString() + "'][data-phase='" + currentphase + "']");
+      label.attr("startOffset", "0%");
+      label.style("opacity", 1);
+      label.each(function(d, i) { // figure out where and what text to display 
+        // get index of starting node
+        var start = parseFloat(this.getAttribute('data-node-to-node-index')); 
+        var end = parseFloat(this.getAttribute('data-node-to-node-index').slice(-1));
+        // get weight of connection
+        var weight = d3.selectAll("[*|href='" + this.getAttribute('href') + "']")[0][0];
+        if(currentphase == "result" && layercount != outputlayer) {
+          var linewidth = document.getElementById(this.getAttribute('href').slice(1)).getBoundingClientRect().width;
+          
+          var weightlabelwidth = weight.getBoundingClientRect().width+parseFloat(labeloffset)/100*linewidth;;
+        }
+          else {
+          var weightlabelwidth = weight.getBoundingClientRect().width+nodeSize/1.5;
+            if(currentphase == "bias" && layercount != outputlayer) {
+              weightlabelwidth = weight.getBoundingClientRect().width;
+            }
+            else if(layercount == outputlayer) {
+              var weightlabelwidth = weight.getBoundingClientRect().width+nodeSize*1.5;
+            }
+          }
+        
+        if(currentphase == "output") {
+          if (layercount === inputlayer) {
+            // get value displayed on starting node
+            var value = d3.select("[data-index='" + start + "']")[0][0].innerHTML;
+            commentary.innerHTML = inputlayer_outputphase;
+          }
+          else if(layercount === outputlayer) {
+             var inputs = d3.selectAll("[data-node-to-node-index$='-" + start + "'][data-phase='activation']");
+            
+            var text = "";
+            var value = 0;
+            for(var i = 0; i < inputs[0].length; i++) {
+              var result = inputs[0][i].getAttribute("data-result");
+              text += result + "+";
+              value += parseFloat(result); // slice off '=' sign
+            }
+            text = text.slice(0,-1);
+            commentary.innerHTML = outputlayer_outputphase;
+            
+          }
+          else {
+            // get all inputs of starting node
+            var inputs = d3.selectAll("[data-node-to-node-index$='-" + start + "'][data-phase='activation']");
+            
+            // idk why reduce doesn't work
+            var value = 0;
+            for(var i = 0; i < inputs[0].length; i++) {
+              value += parseFloat(inputs[0][i].getAttribute("data-result")); // slice off '=' sign
+            }
+            commentary.innerHTML = hiddenlayer_outputphase;
+          }
+          
+          
+
+          if(layercount != outputlayer) {
+            // save calculation in data for retrieval during "result" phase
+            d.result = parseFloat(weight.innerHTML) * parseFloat(value);
+            
+            // format multiplication properly
+            var operation = "•";
+            // if value negative, wrap it in parentheses
+            if(parseFloat(value) < 0) {value = "(" + value + ")";}
+            this.innerHTML = operation + value;
+            if(layercount == outputlayer-1) {
+              var fn = "";
+            } else {var fn = "f("}
+            d.fn1 = fn;
+            d.weight = weight.innerHTML;
+            d.multiply = operation;
+            d.output = value;
+            d.equation = fn + weight.innerHTML + operation + value;
+          }
+          else {
+            d.result = value;
+            this.innerHTML = text;
+            d.equation = "f(" + text;
+            d.fn1 = "f(";
+            d.output = text;
+          }
+          
+          
+        }
+        else if(currentphase == "bias") {
+          if(layercount != outputlayer) {
+            // get value displayed on node in next layer
+            var value = d3.select("[data-index='" + end + "']")[0][0].innerHTML;
+            this.setAttribute("startOffset", "100%");    
+          }
+          else {
+            var value = d3.select("[data-index='" + start + "']")[0][0].innerHTML;
+          }
+          
+          // save calculation in data for retrieval during "result" phase
+          d.result = Math.round(parseFloat(d.result + parseFloat(value))*outputprecision)/outputprecision;
+          
+          
+          // format addition/subtraction
+          var operation = "+";
+          if(parseFloat(value) < 0) {
+            var operation = "-";
+            value = value.slice(1); // remove negative sign on value
+          }
+          
+          d.equation += " " + operation + value + " = " + d.result.toString() + ")";
+          d.plus = operation;
+          d.bias = value;
+          d.sum = d.result.toString();
+          d.fn2 = ") = ";
+          this.innerHTML = operation + value;
+          if(layercount == inputlayer) {
+            commentary.innerHTML = inputlayer_biasphase;
+          }
+          else if(layercount == outputlayer) {
+            commentary.innerHTML = outputlayer_biasphase;
+          }
+          else {
+            commentary.innerHTML = hiddenlayer_biasphase;
+          }
+            
+          
+        }
+        else if(currentphase == "result") {
+//          d.equation += ") = f(" + d.result.toString() + ")";
+          this.innerHTML = "=" + d.result.toString();
+          if(layercount == inputlayer) {
+            commentary.innerHTML = inputlayer_resultphase;
+          }
+          else if(layercount == outputlayer) {
+            commentary.innerHTML = outputlayer_resultphase;
+          }
+          else {
+            commentary.innerHTML = hiddenlayer_resultphase;
+          }
+        }
+        else if(currentphase == "activation") {
+          if(layercount == outputlayer-1) { // if this is connecting to the outputlayer
+            var result = Math.round(d.result * outputprecision)/outputprecision;
+            d.sum = " = ";
+          }
+          else {
+            var result = Math.round(activation_fn(d.result) * outputprecision)/outputprecision;
+          }
+          // save result so next layer can access it
+          this.setAttribute("data-result", result);
+          // make all text on connection disappear
+          d3.selectAll("[data-node-to-node-index='" + this.getAttribute('href').slice(1) + "']").transition().style("opacity", 0).duration(transitionDuration).delay(transitionDelay).each('end', function() {
+            // get text node displaying weight and replace it with equation
+            // using weight node because it is the leftmost node, so has space
+            var label = d3.select("[data-node-to-node-index='" + this.getAttribute('href').slice(1) + "'][class='weight']");
+            
+            var equation = d.equation + " = " + result;
+            d.result = result;
+//            label.text(equation);
+            if(!d.added_equation) { // this is here because I'm a lazy programmer. Please don't let John DeNero see this. Or any part of this program.
+              label.text("");
+              label.append("tspan").attr("class", "equation_fn1").text(d.fn1);
+              if((typeof currentphase != 'undefined')) {
+                label.append("tspan").attr("class", "equation_weight").text(d.weight);
+              }
+              label.append("tspan").attr("class", "equation_multiply").text(d.multiply);
+              label.append("tspan").attr("class", "equation_output").text(d.output);
+              label.append("tspan").attr("class", "equation_plus").text(d.plus);
+              label.append("tspan").attr("class", "equation_bias").text(d.bias);
+              label.append("tspan").attr("class", "equation_fn2").text(d.fn2);
+              label.append("tspan").attr("class", "equation_fn1").text(d.fn1);
+              label.append("tspan").attr("class", "equation_sum").text(d.sum);
+              label.append("tspan").attr("class", "equation_fn2").text(d.fn2);
+              label.append("tspan").attr("class", "equation_result").text(d.result);
+              d.added_equation = true;
+              setEquationColors();
+              final_result = d.result;
+            }
+            // if text exceeds space, squeeze it into the available space
+            var linewidth = document.getElementById(this.getAttribute('href').slice(1)).getBoundingClientRect().width;
+            var textwidth = weight.getBoundingClientRect().width;
+            if(textwidth > linewidth - 1.5*nodeSize) {
+              label.attr("textLength", linewidth-1.5*nodeSize);
+            }
+            if(layercount == outputlayer && textwidth > linewidth - 3*nodeSize) {
+              label.attr("textLength", linewidth-2*nodeSize);
+            }
+            label.transition().style("opacity", 1).duration(transitionDuration)
+              .each("end", function() { // display output
+              if(layercount == outputlayer && !currentphase) {
+                var outputs = d3.selectAll("[data-layer='" + outputlayer + "']");
+                outputs.style("opacity", 0);
+                outputs.text(function(d) {   // adds up inputs. idk why reduce doesn't work
+                  // get all inputs of starting node
+                  var inputs = d3.selectAll("[data-node-to-node-index$='-" + d.id + "'][data-phase='activation']");
+                  var value = 0;
+                  for(var i = 0; i < inputs[0].length; i++) {
+                    value += parseFloat(inputs[0][i].getAttribute("data-result")); 
+                  }
+                  
+                  // display output at end of arrow
+                  // find text element next to current output node, which should have the same index number
+                  var outputText = d3.selectAll("[data-output-index='" + d.id + "']");
+                  outputText[0][0].innerHTML = final_result;
+                  outputText.transition().style("opacity", 1).duration(transitionDuration);
+                  
+//                  commentary.innerHTML = hiddenlayer_outputphase;
+
+                  return "";
+                });
+                
+              }
+            });
+            
+            
+            if(layercount === inputlayer+1) {
+              commentary.innerHTML = inputlayer_activationphase;
+            }
+            else if(layercount == outputlayer && (typeof currentphase == 'undefined')) {
+              commentary.innerHTML = outputlayer_activationphase;
+            }
+            else {
+              commentary.innerHTML = hiddenlayer_activationphase;
+            }
+            
+          });
+          
+//          var label = d3.select("[data-node-to-node-index='" + this.getAttribute('href').slice(1) + "'][class='weight']");
+//          label.text(d.equation + " = " + activation_fn(d.result).toString());
+//          label.transition().style("opacity", 1).duration(transitionDuration);
+        }
+        
+        
+        
+          /* figure out where text should be moved to 
+           so that it aligns with existing text */
+//          var weightlabelwidth = weight.getBoundingClientRect().width-nodeSize/10;
+          // this is here due to completely unknown forces that the programmer doesn't understand
+          if(currentphase == "bias" && layercount != outputlayer) {
+            weightlabelwidth = this.getBoundingClientRect().width+nodeSize/1.5;
+          }
+          var linewidth = document.getElementById(this.getAttribute('href').slice(1)).getBoundingClientRect().width;
+          d.startOffset = weightlabelwidth/linewidth*100;
+          if(currentphase === "output" && layercount == outputlayer) {
+            d.startOffset = "15";
+          }
+          
+        
+      });
+       
+        label.transition().attr("startOffset", function(d, i) {
+            return d.startOffset.toString() + "%";
+          }).duration(transitionDuration).delay(transitionDelay);
+        
+        if(currentphase == "output" && layercount == outputlayer-1) {
+          phaseindex += 3;
+        }
+        else {
+          phaseindex++;
+        }
+
+        
+        currentphase = phases[phaseindex];
+          if(phaseindex == phases.length && layercount < outputlayer) {
+            layercount++;
+            phaseindex = 0;
+            currentphase = phases[phaseindex];
+          }
+        
+        
+        
+      }
+      
+    
+    // bug that I'm too lazy to fix: clicking 'next' right after 'reset' button
+    // results in half-formed transitions
+    function resetSim() {
+      layercount = inputlayer;
+      phaseindex = 0;
+      currentphase = phases[phaseindex];
+      var label = d3.selectAll(".animatedtext, .weight");
+      label.transition().style("opacity", 0).duration(transitionDuration).delay(transitionDelay)
+        .each("end", function(d, i) {
+        if(this.getAttribute("class") === "weight") {
+          if(parseFloat(d.connection) == outputlayer) {
+            this.innerHTML = "";
+          }
+          else {
+            changeWeight.apply(this,[d.id]);
+          }
+          this.setAttribute("textLength", ""); // reset textLength
+          d3.selectAll(".weight").transition().style("opacity", 1).duration(transitionDuration);
+        }
+        else {
+          this.innerHTML = "";
+          d.added_equation = false;
+        }
+        commentary.innerHTML = directions;
+      });
+      
+      // transition output text
+      var outputs = d3.selectAll("[data-output-index]");
+      outputs.transition().style("opacity", 0).duration(transitionDuration).delay(transitionDelay).each("end", function(d, i) {
+        this.innerHTML = "";
+      })
+      
+      // make sliders changeable again.
+      var weight_sliders = document.getElementsByClassName("weight_slider");
+      for(var i = 0; i < weight_sliders.length; i++) {
+        weight_sliders[i].disabled = false;
+      }
+      
+      
+    }
+    
+    
+  </script>
+  
+  <script> // set colors for final equation
+    /*label.append("tspan").attr("class", "equation_fn1").text(d.fn1);
+              label.append("tspan").attr("class", "equation_weight").text(d.weight);
+              label.append("tspan").attr("class", "equation_multiply").text(d.multiply);
+              label.append("tspan").attr("class", "equation_output").text(d.output);
+              label.append("tspan").attr("class", "equation_plus").text(d.plus);
+              label.append("tspan").attr("class", "equation_bias").text(d.bias);
+              label.append("tspan").attr("class", "equation_fn2").text(d.fn2);
+              label.append("tspan").attr("class", "equation_fn1").text(d.fn1);
+              label.append("tspan").attr("class", "equation_sum").text(d.sum);
+              label.append("tspan").attr("class", "equation_fn2").text(d.fn2);
+              label.append("tspan").attr("class", "equation_result").text(d.result);
+*/
+    function setEquationColors() {
+      d3.selectAll("[class='equation_fn1']").style("fill", activationcolor);
+      d3.selectAll("[class='equation_weight']").style("fill", weightcolor);
+      d3.selectAll("[class='equation_multiply']").style("fill", operationcolor);
+      d3.selectAll("[class='equation_output']").style("fill", outputcolor);
+      d3.selectAll("[class='equation_plus']").style("fill", operationcolor);
+      d3.selectAll("[class='equation_bias']").style("fill", biascolor);
+      d3.selectAll("[class='equation_fn2']").style("fill", activationcolor);
+      d3.selectAll("[class='equation_sum']").style("fill", sumcolor);
+      d3.selectAll("[class='equation_result']").style("fill", resultcolor);
+    }
+  </script>
+  <div id="controls">
+    <button id="nextButton" onclick="moveText.apply(this)">next</button>
+    <button onclick="resetSim.apply(this)">reset</button>
+  </div>
+  <div id="commentaryWrapper">
+    <p id="commentary"></p>
+  </div>
+  <script>
+    insertDirections();
+    d3.select("#commentaryWrapper").style("width", (width).toString() + "px");
+    document.getElementById("commentaryWrapper").style.width = width.toString();
+  </script>
+  
+</body>
+</html>
+
+
+<!-- To make gif of this:
+set directions = ""
+run document.getElementById('nextButton').click() to click next button
+-->

@@ -1,0 +1,33 @@
+#Permalinks
+permalink:           pretty
+
+# Setup
+title:               Arpit Sharma
+tagline:             'Personal Website'
+description:         
+url:                 http://sharma-arpit.github.io
+baseurl:             
+paginate:            5
+paginate_path:       "page:num"
+
+# About/contact
+author:
+  name:              Arpit Sharma
+  url:               http://sharma-arpit.github.io
+  email:             s.arpit9656@gmail.com
+  facebook:          
+  twitter:           s_arpit10
+  github:            sharma-arpit
+  linkedin:          sarpit
+
+# auto generate ids for headings
+auto_ids: true
+
+# Custom vars
+version:             1.0.0
+future:             true 
+
+excerpt_separator:   <!-- break -->
+
+gems: [jekyll-paginate]
+

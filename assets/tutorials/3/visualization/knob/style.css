@@ -1,0 +1,80 @@
+body {
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Chrome/Safari/Opera */
+     -khtml-user-select: none; /* Konqueror */
+       -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  not supported by any browser */
+}
+.dial {
+  width: 256px;
+  height: 256px;
+  border: 1px gray dotted;
+}
+
+.dial .knob {
+  /*transition: 500ms transform;*/
+}
+.dial .knob circle {
+  stroke: gray;
+  stroke-width: 0.25px;
+  fill: url(#knobgradient);
+}
+.dial .knob line {
+  stroke: gray;
+  stroke-width: 0.5px;
+  stroke-linecap: round;
+}
+.dial .knob_number {
+  fill: white;
+  stroke: gray;
+  stroke-width: 0.0625px;
+  font-size: 6px;
+  font-family: "Helvetica", "Arial", sans-serif;
+  letter-spacing: -0.5px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  
+  /* https://stackoverflow.com/questions/826782/css-rule-to-disable-text-selection-highlighting */
+  -webkit-touch-callout: none;
+  -ms-user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+text{
+  font-family: "PT Sans", Helvetica, Arial, sans-serif;
+}
+
+p {
+  font-family: "PT Sans", Helvetica, Arial, sans-serif;
+}
+
+svg {
+  overflow: visible;
+}
+
+.input_slider {
+  -webkit-appearance: slider-vertical;
+  position: relative;
+  top: 5px;
+  width: 10px;
+}
+
+#controls {
+  position: relative;
+
+}
+#commentary {
+  position: relative;
+  text-align: center;
+  /* I'm too lazy to figure this out but if you want to change the font, you'll also have to 
+  change the font in the line after:
+  weightslider.append("xhtml:center").append("xhtml:div")
+  because CSS seems to not extend to elements inside foreignObject */
+  font-family: "PT Sans", Helvetica, Arial, sans-serif; 
+}
+

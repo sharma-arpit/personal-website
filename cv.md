@@ -1,6 +1,6 @@
 ---
 layout: page
-permalink: /cv/
 title: CV
+permalink: /cv/
 cv_pdf: cv.pdf
 ---

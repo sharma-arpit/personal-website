@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: not pages
 title: Archive
 ---
 
